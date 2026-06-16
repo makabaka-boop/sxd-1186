@@ -183,12 +183,12 @@ export function useFeedback() {
     return [...new Set(feedbacks.value.map((f) => f.feedbackPerson))].sort();
   });
 
-  function addFeedback(feedbackData: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt' | 'status'>) {
+  function addFeedback(feedbackData: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt'> & { status?: FeedbackStatus }) {
     const now = new Date().toISOString();
     const newFeedback: Feedback = {
       id: generateId(),
       ...feedbackData,
-      status: 'pending',
+      status: feedbackData.status || 'pending',
       createdAt: now,
       updatedAt: now,
     };
@@ -226,10 +226,19 @@ export function useFeedback() {
   }
 
   function addMergeItem(title: string, feedbackIds: string[]) {
+    const originalStatuses: Record<string, FeedbackStatus> = {};
+    feedbackIds.forEach((id) => {
+      const feedback = feedbacks.value.find((f) => f.id === id);
+      if (feedback) {
+        originalStatuses[id] = feedback.status;
+      }
+    });
+
     const newMergeItem: MergeItem = {
       id: generateId(),
       title,
       feedbackIds,
+      originalStatuses,
       status: 'processing',
       createdAt: new Date().toISOString(),
     };
@@ -247,7 +256,8 @@ export function useFeedback() {
     if (mergeItemIndex !== -1) {
       const mergeItem = mergeItems.value[mergeItemIndex];
       mergeItem.feedbackIds.forEach((id) => {
-        updateFeedback(id, { status: 'pending', mergedIntoId: undefined });
+        const originalStatus = mergeItem.originalStatuses?.[id] || 'pending';
+        updateFeedback(id, { status: originalStatus, mergedIntoId: undefined });
       });
       mergeItems.value.splice(mergeItemIndex, 1);
     }

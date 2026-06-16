@@ -46,7 +46,7 @@ const {
   toggleFilter,
   clearAllFilters,
   isFilterActive,
-} = useFilter(activeFeedbacks);
+} = useFilter(feedbacks);
 
 const { allAlerts, batchScores, frequentIssues } = useSmartDetect(feedbacks);
 
@@ -86,7 +86,7 @@ function handleDelete(id: string) {
   }
 }
 
-function handleFormSubmit(data: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt' | 'status'>) {
+function handleFormSubmit(data: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt'> & { status?: FeedbackStatus }) {
   if (editingFeedback.value) {
     updateFeedback(editingFeedback.value.id, data);
   } else {

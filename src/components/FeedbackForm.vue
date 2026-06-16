@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { X, Plus } from 'lucide-vue-next';
-import type { Feedback, Priority } from '../types/feedback';
-import { PRIORITY_LABELS, SWEETNESS_LABELS } from '../types/feedback';
+import type { Feedback, Priority, FeedbackStatus } from '../types/feedback';
+import { PRIORITY_LABELS, STATUS_LABELS, SWEETNESS_LABELS } from '../types/feedback';
 
 const props = defineProps<{
   visible: boolean;
@@ -14,7 +14,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  submit: [data: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt' | 'status'>];
+  submit: [data: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt'> & { status?: FeedbackStatus }];
 }>();
 
 const form = ref({
@@ -25,6 +25,7 @@ const form = ref({
   suggestion: '',
   feedbackPerson: '',
   priority: 'medium' as Priority,
+  status: 'pending' as FeedbackStatus,
 });
 
 const keywordInput = ref('');
@@ -50,6 +51,7 @@ watch(
           suggestion: props.feedback.suggestion,
           feedbackPerson: props.feedback.feedbackPerson,
           priority: props.feedback.priority,
+          status: props.feedback.status,
         };
       } else {
         form.value = {
@@ -60,6 +62,7 @@ watch(
           suggestion: '',
           feedbackPerson: '',
           priority: 'medium',
+          status: 'pending',
         };
       }
       keywordInput.value = '';
@@ -277,6 +280,32 @@ function handleClose() {
                         : 'border-matcha-400 bg-matcha-50 text-matcha-700'
                       : 'border-tea-100 bg-white text-tea-400 hover:border-tea-200',
                   ]"
+                >
+                  {{ label }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="!isEdit || feedback?.status !== 'merged'">
+              <label class="block text-sm font-medium text-tea-700 mb-2">处理状态</label>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="(label, key) in STATUS_LABELS"
+                  :key="key"
+                  @click="form.status = key as FeedbackStatus"
+                  class="px-4 py-2 rounded-lg border-2 font-medium transition-all text-sm"
+                  :class="[
+                    form.status === key
+                      ? key === 'pending'
+                        ? 'border-amber-400 bg-amber-50 text-amber-700'
+                        : key === 'processing'
+                        ? 'border-blue-400 bg-blue-50 text-blue-700'
+                        : key === 'resolved'
+                        ? 'border-matcha-400 bg-matcha-50 text-matcha-700'
+                        : 'border-gray-400 bg-gray-50 text-gray-700'
+                      : 'border-tea-100 bg-white text-tea-400 hover:border-tea-200',
+                  ]"
+                  :disabled="key === 'merged'"
                 >
                   {{ label }}
                 </button>

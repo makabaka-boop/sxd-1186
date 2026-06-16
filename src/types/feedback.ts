@@ -21,6 +21,7 @@ export interface MergeItem {
   id: string;
   title: string;
   feedbackIds: string[];
+  originalStatuses: Record<string, FeedbackStatus>;
   status: FeedbackStatus;
   createdAt: string;
 }
