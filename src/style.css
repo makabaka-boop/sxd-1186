@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+  color: #4a3728;
+  background-color: #FDF8F0;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #FDF8F0 0%, #F9EFDC 100%);
+}
+
+#app {
+  min-height: 100vh;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-tea-600 text-white px-4 py-2 rounded-lg font-medium
+           hover:bg-tea-700 transition-all duration-200
+           shadow-card hover:shadow-card-hover
+           active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-tea-700 px-4 py-2 rounded-lg font-medium
+           border border-tea-200 hover:bg-tea-50 transition-all duration-200
+           shadow-sm hover:shadow-md;
+  }
+
+  .btn-danger {
+    @apply bg-caramel-500 text-white px-4 py-2 rounded-lg font-medium
+           hover:bg-caramel-600 transition-all duration-200
+           shadow-card hover:shadow-card-hover;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-card p-5 transition-all duration-300
+           hover:shadow-card-hover;
+  }
+
+  .tag {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 border border-tea-200 rounded-lg
+           focus:outline-none focus:ring-2 focus:ring-tea-400 focus:border-transparent
+           bg-white text-tea-900 placeholder-tea-300
+           transition-all duration-200;
+  }
+
+  .select-field {
+    @apply w-full px-3 py-2 border border-tea-200 rounded-lg
+           focus:outline-none focus:ring-2 focus:ring-tea-400 focus:border-transparent
+           bg-white text-tea-900 transition-all duration-200 cursor-pointer;
+  }
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F9EFDC;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #DBA657;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #CF8C39;
+}
+
+/* 动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
