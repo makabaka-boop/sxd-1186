@@ -54,6 +54,26 @@ export function toDateInputValue(dateStr?: string): string {
   return `${year}-${month}-${day}`;
 }
 
+export function toDateTimeInputValues(dateStr?: string): { date: string; time: string } {
+  if (!dateStr) return { date: '', time: '' };
+  const date = new Date(dateStr);
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return {
+    date: `${year}-${month}-${day}`,
+    time: `${hours}:${minutes}`,
+  };
+}
+
+export function fromDateTimeInputValues(dateVal: string, timeVal: string): string {
+  if (!dateVal) return '';
+  const time = timeVal || '09:00';
+  return new Date(`${dateVal}T${time}:00`).toISOString();
+}
+
 export function textSimilarity(text1: string, text2: string): number {
   if (!text1 || !text2) return 0;
   const s1 = text1.toLowerCase().trim();

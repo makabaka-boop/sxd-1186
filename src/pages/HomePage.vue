@@ -141,8 +141,29 @@ function handleExport() {
 function handleFocusAlert(alert: SmartAlert) {
   clearAllFilters();
   selectedFeedbackIds.value.clear();
+
+  switch (alert.type) {
+    case 'high_priority_pending':
+      setFilter('priority', ['high']);
+      setFilter('status', ['pending']);
+      break;
+    case 'upcoming_deadline':
+      setFilter('dueStatus', ['upcoming']);
+      break;
+    case 'overdue_feedback':
+      setFilter('dueStatus', ['overdue']);
+      break;
+    case 'negative_batch':
+    case 'missing_fields':
+    case 'duplicate_suggestion':
+    default:
+      break;
+  }
+
   alert.relatedFeedbackIds.forEach((id) => {
-    selectedFeedbackIds.value.add(id);
+    if (activeFeedbacks.value.some((f) => f.id === id)) {
+      selectedFeedbackIds.value.add(id);
+    }
   });
 }
 

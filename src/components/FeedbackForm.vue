@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
-import { X, Plus, UserCheck, CalendarDays, FileText, Clock } from 'lucide-vue-next';
+import { ref, watch, computed, nextTick } from 'vue';
+import { X, Plus, UserCheck, CalendarDays, FileText, Clock, RefreshCw } from 'lucide-vue-next';
 import type { Feedback, Priority, FeedbackStatus } from '../types/feedback';
 import { PRIORITY_LABELS, STATUS_LABELS, SWEETNESS_LABELS } from '../types/feedback';
-import { toDateInputValue, formatDate } from '../utils/helpers';
+import { toDateInputValue, formatDate, toDateTimeInputValues, fromDateTimeInputValues } from '../utils/helpers';
 
 const props = defineProps<{
   visible: boolean;
@@ -35,6 +35,9 @@ const form = ref({
 
 const keywordInput = ref('');
 const dueDateInput = ref('');
+const followUpDateInput = ref('');
+const followUpTimeInput = ref('');
+const isFormLoaded = ref(false);
 
 const isEdit = computed(() => !!props.feedback);
 const title = computed(() => (isEdit.value ? '编辑反馈' : '新增反馈'));
@@ -46,8 +49,9 @@ const predefinedKeywords = [
 
 watch(
   () => props.visible,
-  (val) => {
+  async (val) => {
     if (val) {
+      isFormLoaded.value = false;
       if (props.feedback) {
         form.value = {
           snackName: props.feedback.snackName,
@@ -64,6 +68,9 @@ watch(
           lastFollowUpAt: props.feedback.lastFollowUpAt || '',
         };
         dueDateInput.value = toDateInputValue(props.feedback.dueDate);
+        const { date, time } = toDateTimeInputValues(props.feedback.lastFollowUpAt);
+        followUpDateInput.value = date;
+        followUpTimeInput.value = time;
       } else {
         form.value = {
           snackName: '',
@@ -80,8 +87,12 @@ watch(
           lastFollowUpAt: '',
         };
         dueDateInput.value = '';
+        followUpDateInput.value = '';
+        followUpTimeInput.value = '';
       }
       keywordInput.value = '';
+      await nextTick();
+      isFormLoaded.value = true;
     }
   }
 );
@@ -95,6 +106,40 @@ watch(dueDateInput, (val) => {
     form.value.dueDate = '';
   }
 });
+
+watch(
+  [followUpDateInput, followUpTimeInput],
+  ([dateVal, timeVal]) => {
+    if (dateVal) {
+      form.value.lastFollowUpAt = fromDateTimeInputValues(dateVal, timeVal);
+    } else {
+      form.value.lastFollowUpAt = '';
+    }
+  }
+);
+
+function touchFollowUpTime() {
+  if (!isFormLoaded.value) return;
+  const now = new Date();
+  form.value.lastFollowUpAt = now.toISOString();
+  const { date, time } = toDateTimeInputValues(now.toISOString());
+  followUpDateInput.value = date;
+  followUpTimeInput.value = time;
+}
+
+watch(
+  () => [form.value.assignee, form.value.dueDate, form.value.handleNote, form.value.status],
+  () => {
+    if (isFormLoaded.value) {
+      touchFollowUpTime();
+    }
+  },
+  { deep: false }
+);
+
+function setFollowUpToNow() {
+  touchFollowUpTime();
+}
 
 function addKeyword(keyword: string) {
   if (keyword && !form.value.textureKeywords.includes(keyword)) {
@@ -336,16 +381,42 @@ function handleClose() {
                 </div>
 
                 <div>
+                  <label class="block text-sm font-medium text-tea-700 mb-1.5 flex items-center gap-1.5">
+                    <Clock class="w-4 h-4 text-tea-400" />
+                    最后跟进时间
+                    <button
+                      type="button"
+                      @click="setFollowUpToNow"
+                      class="ml-auto text-xs text-tea-500 hover:text-tea-700 flex items-center gap-1 transition-colors"
+                    >
+                      <RefreshCw class="w-3 h-3" />
+                      更新为现在
+                    </button>
+                  </label>
+                  <div class="flex gap-2">
+                    <input
+                      v-model="followUpDateInput"
+                      type="date"
+                      class="input-field flex-1"
+                    />
+                    <input
+                      v-model="followUpTimeInput"
+                      type="time"
+                      class="input-field w-28"
+                    />
+                  </div>
+                  <p class="text-xs text-tea-400 mt-1">
+                    修改负责人、截止时间、备注或状态时会自动更新
+                  </p>
+                </div>
+
+                <div>
                   <label class="block text-sm font-medium text-tea-700 mb-1.5">处理备注</label>
                   <textarea
                     v-model="form.handleNote"
                     class="input-field min-h-[70px] resize-y"
                     placeholder="记录处理进展、沟通情况等..."
                   ></textarea>
-                  <p v-if="form.lastFollowUpAt" class="text-xs text-tea-400 mt-1 flex items-center gap-1">
-                    <Clock class="w-3 h-3" />
-                    上次跟进：{{ formatDate(form.lastFollowUpAt) }}
-                  </p>
                 </div>
               </div>
             </div>
