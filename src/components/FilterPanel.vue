@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Filter, X, ChevronDown, ChevronUp, UserCheck, Clock } from 'lucide-vue-next';
-import type { FilterOptions, Priority, FeedbackStatus, DueStatus } from '../types/feedback';
-import { PRIORITY_LABELS, STATUS_LABELS, DUE_STATUS_LABELS } from '../types/feedback';
+import { Filter, X, ChevronDown, ChevronUp, UserCheck, Clock, History } from 'lucide-vue-next';
+import type { FilterOptions, Priority, FeedbackStatus, DueStatus, FollowUpStatus } from '../types/feedback';
+import { PRIORITY_LABELS, STATUS_LABELS, DUE_STATUS_LABELS, FOLLOW_UP_STATUS_LABELS } from '../types/feedback';
 
 const props = defineProps<{
   filters: FilterOptions;
@@ -30,6 +30,7 @@ function isActive(field: keyof FilterOptions, value: string): boolean {
 }
 
 const dueStatusOptions: DueStatus[] = ['overdue', 'upcoming', 'normal', 'no_due'];
+const followUpStatusOptions: FollowUpStatus[] = ['no_followup', 'recent_followup', 'multiple_followups', 'long_no_followup'];
 </script>
 
 <template>
@@ -191,6 +192,34 @@ const dueStatusOptions: DueStatus[] = ['overdue', 'upcoming', 'normal', 'no_due'
             ]"
           >
             {{ DUE_STATUS_LABELS[status] }}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h4 class="text-sm font-medium text-tea-700 mb-2 flex items-center gap-1.5">
+          <History class="w-3.5 h-3.5 text-tea-400" />
+          跟进状态
+        </h4>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-for="status in followUpStatusOptions"
+            :key="status"
+            @click="toggleFilter('followUpStatus', status)"
+            class="px-2.5 py-1 text-xs rounded-full border transition-all"
+            :class="[
+              isActive('followUpStatus', status)
+                ? status === 'long_no_followup'
+                  ? 'bg-red-500 border-red-500 text-white'
+                  : status === 'no_followup'
+                  ? 'bg-gray-500 border-gray-500 text-white'
+                  : status === 'recent_followup'
+                  ? 'bg-matcha-500 border-matcha-500 text-white'
+                  : 'bg-blue-500 border-blue-500 text-white'
+                : 'bg-white border-tea-200 text-tea-600 hover:border-tea-400 hover:bg-tea-50',
+            ]"
+          >
+            {{ FOLLOW_UP_STATUS_LABELS[status] }}
           </button>
         </div>
       </div>

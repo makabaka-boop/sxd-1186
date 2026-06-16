@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import {
   Edit3,
   Trash2,
@@ -10,10 +10,15 @@ import {
   AlertCircle,
   Clock,
   FileText,
+  ChevronDown,
+  ChevronUp,
+  MessageSquare,
+  History,
+  AlertTriangle,
 } from 'lucide-vue-next';
-import type { Feedback } from '../types/feedback';
+import type { Feedback, FeedbackStatus } from '../types/feedback';
 import { PRIORITY_LABELS, STATUS_LABELS, SWEETNESS_LABELS } from '../types/feedback';
-import { formatDate, formatDateShort, getDueStatus, getDaysRemaining } from '../utils/helpers';
+import { formatDate, formatDateShort, getDueStatus, getDaysSinceFollowUp, getFollowUpStatus, isLongNoFollowUp, truncateText } from '../utils/helpers';
 
 const props = defineProps<{
   feedback: Feedback;
@@ -27,6 +32,8 @@ const emit = defineEmits<{
   delete: [id: string];
   select: [id: string, selected: boolean];
 }>();
+
+const showTimeline = ref(false);
 
 const priorityClass = computed(() => {
   switch (props.feedback.priority) {
@@ -101,6 +108,62 @@ const dueBadgeText = computed(() => {
   return `剩${days}天`;
 });
 
+const sortedFollowUps = computed(() => {
+  return [...(props.feedback.followUpRecords || [])].sort(
+    (a, b) => new Date(b.followUpAt).getTime() - new Date(a.followUpAt).getTime()
+  );
+});
+
+const latestFollowUp = computed(() => sortedFollowUps.value[0]);
+
+const followUpCount = computed(() => sortedFollowUps.value.length);
+
+const followUpStatus = computed(() => getFollowUpStatus(props.feedback));
+
+const isLongNoFollowUpFlag = computed(() => isLongNoFollowUp(props.feedback));
+
+const daysSinceFollowUp = computed(() => {
+  return getDaysSinceFollowUp(props.feedback.lastFollowUpAt);
+});
+
+const followUpBadgeClass = computed(() => {
+  if (followUpStatus.value === 'long_no_followup') {
+    return 'bg-red-50 text-red-600 border-red-200';
+  }
+  if (followUpStatus.value === 'multiple_followups') {
+    return 'bg-blue-50 text-blue-600 border-blue-200';
+  }
+  if (followUpStatus.value === 'recent_followup') {
+    return 'bg-matcha-50 text-matcha-600 border-matcha-200';
+  }
+  return 'bg-gray-50 text-gray-500 border-gray-200';
+});
+
+function getFollowUpStatusClass(status: FeedbackStatus): string {
+  switch (status) {
+    case 'pending':
+      return 'bg-amber-50 text-amber-700 border-amber-200';
+    case 'processing':
+      return 'bg-blue-50 text-blue-700 border-blue-200';
+    case 'resolved':
+      return 'bg-matcha-50 text-matcha-700 border-matcha-200';
+    case 'merged':
+      return 'bg-gray-50 text-gray-500 border-gray-200';
+    default:
+      return 'bg-gray-50 text-gray-700 border-gray-200';
+  }
+}
+
+function getDaysRemaining(dueDate?: string): number | null {
+  if (!dueDate) return null;
+  const now = new Date();
+  const due = new Date(dueDate);
+  const dueEndOfDay = new Date(due);
+  dueEndOfDay.setHours(23, 59, 59, 999);
+  const diffMs = dueEndOfDay.getTime() - now.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
 function handleEdit() {
   emit('edit', props.feedback);
 }
@@ -112,6 +175,10 @@ function handleDelete() {
 function handleSelect() {
   emit('select', props.feedback.id, !props.selected);
 }
+
+function toggleTimeline() {
+  showTimeline.value = !showTimeline.value;
+}
 </script>
 
 <template>
@@ -120,6 +187,7 @@ function handleSelect() {
     :class="{
       'ring-2 ring-tea-500 ring-offset-2': selected,
       'opacity-60': feedback.status === 'merged',
+      'ring-2 ring-red-400/30': isLongNoFollowUpFlag,
     }"
   >
     <div class="absolute top-0 left-0 w-1 h-full" :class="priorityClass.replace('bg-', 'bg-').split(' ')[0]"></div>
@@ -158,6 +226,21 @@ function handleSelect() {
         <Clock v-if="dueInfo.status === 'upcoming' && feedback.status !== 'resolved' && feedback.status !== 'merged'" class="w-3 h-3" />
         <AlertCircle v-else-if="dueInfo.status === 'overdue' && feedback.status !== 'resolved' && feedback.status !== 'merged'" class="w-3 h-3" />
         {{ dueBadgeText }}
+      </span>
+      <span
+        v-if="followUpCount > 0"
+        class="tag border flex items-center gap-1"
+        :class="followUpBadgeClass"
+      >
+        <History class="w-3 h-3" />
+        {{ followUpCount }}次跟进
+      </span>
+      <span
+        v-else-if="isLongNoFollowUpFlag"
+        class="tag border flex items-center gap-1 bg-red-50 text-red-600 border-red-200 animate-pulse"
+      >
+        <AlertTriangle class="w-3 h-3" />
+        长时间未跟进
       </span>
     </div>
 
@@ -260,8 +343,88 @@ function handleSelect() {
       </p>
     </div>
 
+    <!-- 最近跟进摘要 -->
     <div
-      v-if="feedback.lastFollowUpAt"
+      v-if="latestFollowUp"
+      class="mb-3"
+    >
+      <div
+        class="flex items-center justify-between mb-1.5"
+      >
+        <p class="text-sm text-tea-600 flex items-center gap-1 cursor-pointer hover:text-tea-800"
+          @click="toggleTimeline"
+        >
+          <MessageSquare class="w-3.5 h-3.5" />
+          <span class="font-medium">最近跟进</span>
+          <span class="text-tea-400">·</span>
+          <span class="text-tea-500">{{ latestFollowUp.handler }}</span>
+        </p>
+        <button
+          v-if="followUpCount > 1"
+          @click="toggleTimeline"
+          class="text-xs text-tea-500 hover:text-tea-700 flex items-center gap-0.5 transition-colors"
+        >
+          {{ showTimeline ? '收起' : '查看全部' }} ({{ followUpCount }})
+          <ChevronDown v-if="!showTimeline" class="w-3.5 h-3.5" />
+          <ChevronUp v-else class="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div class="text-sm text-tea-800 bg-gradient-to-r from-tea-50 to-blue-50 rounded-lg p-3 border border-tea-100">
+        <div class="flex items-start justify-between gap-2">
+          <p class="flex-1">{{ truncateText(latestFollowUp.description, 80) }}</p>
+          <span class="tag text-[10px] border shrink-0" :class="getFollowUpStatusClass(latestFollowUp.status)">
+            {{ STATUS_LABELS[latestFollowUp.status] }}
+          </span>
+        </div>
+        <p class="text-xs text-tea-400 mt-1.5 flex items-center gap-1">
+          <Clock class="w-3 h-3" />
+          {{ formatDate(latestFollowUp.followUpAt) }}
+          <template v-if="daysSinceFollowUp !== null">
+            <span class="text-tea-300">·</span>
+            <span>{{ daysSinceFollowUp === 0 ? '今天' : daysSinceFollowUp + '天前' }}</span>
+          </template>
+        </p>
+      </div>
+    </div>
+
+    <!-- 时间线展开 -->
+    <div v-if="showTimeline && followUpCount > 0" class="mb-3">
+      <div class="space-y-2.5 mt-3 pt-3 border-t border-tea-100">
+        <div
+          v-for="(record, index) in sortedFollowUps"
+          :key="record.id"
+          class="relative pl-6"
+        >
+          <div
+            class="absolute left-1 top-1.5 w-2.5 h-2.5 rounded-full bg-tea-500 border-2 border-white shadow-sm"
+            :class="{ 'bg-tea-300': index > 0 }"
+          ></div>
+          <div
+            v-if="index < sortedFollowUps.length - 1"
+            class="absolute left-[9px] top-4 bottom-[-8px] w-0.5 bg-tea-200"
+          ></div>
+          <div class="bg-white/70 rounded-lg p-2.5 border border-tea-100">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="text-xs font-medium text-tea-700 flex items-center gap-1">
+                <User class="w-3 h-3 text-tea-400" />
+                {{ record.handler }}
+              </span>
+              <span class="tag text-[10px] border" :class="getFollowUpStatusClass(record.status)">
+                {{ STATUS_LABELS[record.status] }}
+              </span>
+            </div>
+            <p class="text-xs text-tea-800 mb-1">{{ record.description }}</p>
+            <p class="text-[10px] text-tea-400 flex items-center gap-1">
+              <Clock class="w-2.5 h-2.5" />
+              {{ formatDate(record.followUpAt) }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="!latestFollowUp && feedback.lastFollowUpAt"
       class="mb-3 flex items-center gap-1 text-xs text-tea-400"
     >
       <Clock class="w-3 h-3" />

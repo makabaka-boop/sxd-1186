@@ -1,9 +1,28 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue';
-import { X, Plus, UserCheck, CalendarDays, FileText, Clock, RefreshCw } from 'lucide-vue-next';
-import type { Feedback, Priority, FeedbackStatus } from '../types/feedback';
+import {
+  X,
+  Plus,
+  UserCheck,
+  CalendarDays,
+  FileText,
+  Clock,
+  RefreshCw,
+  MessageSquare,
+  ChevronDown,
+  ChevronUp,
+  User,
+  Trash2,
+} from 'lucide-vue-next';
+import type { Feedback, Priority, FeedbackStatus, FollowUpRecord } from '../types/feedback';
 import { PRIORITY_LABELS, STATUS_LABELS, SWEETNESS_LABELS } from '../types/feedback';
-import { toDateInputValue, formatDate, toDateTimeInputValues, fromDateTimeInputValues } from '../utils/helpers';
+import {
+  toDateInputValue,
+  formatDate,
+  toDateTimeInputValues,
+  fromDateTimeInputValues,
+  generateId,
+} from '../utils/helpers';
 
 const props = defineProps<{
   visible: boolean;
@@ -15,7 +34,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  submit: [data: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt'> & { status?: FeedbackStatus }];
+  submit: [
+    data: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt'> & {
+      status?: FeedbackStatus;
+      newFollowUp?: Omit<FollowUpRecord, 'id'> | null;
+    }
+  ];
 }>();
 
 const form = ref({
@@ -31,6 +55,7 @@ const form = ref({
   dueDate: '',
   handleNote: '',
   lastFollowUpAt: '',
+  followUpRecords: [] as FollowUpRecord[],
 });
 
 const keywordInput = ref('');
@@ -38,9 +63,24 @@ const dueDateInput = ref('');
 const followUpDateInput = ref('');
 const followUpTimeInput = ref('');
 const isFormLoaded = ref(false);
+const showTimeline = ref(false);
+
+const newFollowUp = ref({
+  description: '',
+  handler: '',
+  followUpAt: '',
+  dateInput: '',
+  timeInput: '',
+  status: 'pending' as FeedbackStatus,
+});
 
 const isEdit = computed(() => !!props.feedback);
 const title = computed(() => (isEdit.value ? '编辑反馈' : '新增反馈'));
+const sortedFollowUps = computed(() => {
+  return [...form.value.followUpRecords].sort(
+    (a, b) => new Date(b.followUpAt).getTime() - new Date(a.followUpAt).getTime()
+  );
+});
 
 const predefinedKeywords = [
   '酥脆', '软糯', '香甜', '清香', '细腻', '香浓',
@@ -66,6 +106,7 @@ watch(
           dueDate: props.feedback.dueDate || '',
           handleNote: props.feedback.handleNote || '',
           lastFollowUpAt: props.feedback.lastFollowUpAt || '',
+          followUpRecords: [...(props.feedback.followUpRecords || [])],
         };
         dueDateInput.value = toDateInputValue(props.feedback.dueDate);
         const { date, time } = toDateTimeInputValues(props.feedback.lastFollowUpAt);
@@ -85,17 +126,33 @@ watch(
           dueDate: '',
           handleNote: '',
           lastFollowUpAt: '',
+          followUpRecords: [],
         };
         dueDateInput.value = '';
         followUpDateInput.value = '';
         followUpTimeInput.value = '';
       }
       keywordInput.value = '';
+      resetNewFollowUp();
+      showTimeline.value = false;
       await nextTick();
       isFormLoaded.value = true;
     }
   }
 );
+
+function resetNewFollowUp() {
+  const now = new Date();
+  const { date, time } = toDateTimeInputValues(now.toISOString());
+  newFollowUp.value = {
+    description: '',
+    handler: form.value.assignee || '',
+    followUpAt: now.toISOString(),
+    dateInput: date,
+    timeInput: time,
+    status: form.value.status,
+  };
+}
 
 watch(dueDateInput, (val) => {
   if (val) {
@@ -114,6 +171,15 @@ watch(
       form.value.lastFollowUpAt = fromDateTimeInputValues(dateVal, timeVal);
     } else {
       form.value.lastFollowUpAt = '';
+    }
+  }
+);
+
+watch(
+  [() => newFollowUp.value.dateInput, () => newFollowUp.value.timeInput],
+  ([dateVal, timeVal]) => {
+    if (dateVal) {
+      newFollowUp.value.followUpAt = fromDateTimeInputValues(dateVal, timeVal);
     }
   }
 );
@@ -141,6 +207,14 @@ function setFollowUpToNow() {
   touchFollowUpTime();
 }
 
+function setNewFollowUpToNow() {
+  const now = new Date();
+  const { date, time } = toDateTimeInputValues(now.toISOString());
+  newFollowUp.value.dateInput = date;
+  newFollowUp.value.timeInput = time;
+  newFollowUp.value.followUpAt = now.toISOString();
+}
+
 function addKeyword(keyword: string) {
   if (keyword && !form.value.textureKeywords.includes(keyword)) {
     form.value.textureKeywords.push(keyword);
@@ -162,6 +236,21 @@ function handleKeywordKeydown(e: KeyboardEvent) {
   }
 }
 
+function getFollowUpStatusClass(status: FeedbackStatus): string {
+  switch (status) {
+    case 'pending':
+      return 'bg-amber-50 text-amber-700 border-amber-200';
+    case 'processing':
+      return 'bg-blue-50 text-blue-700 border-blue-200';
+    case 'resolved':
+      return 'bg-matcha-50 text-matcha-700 border-matcha-200';
+    case 'merged':
+      return 'bg-gray-50 text-gray-500 border-gray-200';
+    default:
+      return 'bg-gray-50 text-gray-700 border-gray-200';
+  }
+}
+
 function handleSubmit() {
   if (!form.value.snackName.trim()) {
     alert('请填写茶点名称');
@@ -175,11 +264,24 @@ function handleSubmit() {
     alert('请填写反馈人');
     return;
   }
-  const submitData = { ...form.value };
-  if (isEdit.value && (form.value.handleNote || form.value.status !== props.feedback?.status)) {
-    submitData.lastFollowUpAt = new Date().toISOString();
+
+  let newFollowUpData: Omit<FollowUpRecord, 'id'> | null = null;
+  if (isEdit.value && newFollowUp.value.description.trim()) {
+    if (!newFollowUp.value.handler.trim()) {
+      alert('请填写跟进处理人');
+      return;
+    }
+    newFollowUpData = {
+      description: newFollowUp.value.description.trim(),
+      handler: newFollowUp.value.handler.trim(),
+      followUpAt: newFollowUp.value.followUpAt || new Date().toISOString(),
+      status: newFollowUp.value.status,
+    };
+    form.value.status = newFollowUp.value.status;
   }
-  emit('submit', submitData);
+
+  const submitData = { ...form.value };
+  emit('submit', { ...submitData, newFollowUp: newFollowUpData });
 }
 
 function handleClose() {
@@ -196,7 +298,7 @@ function handleClose() {
     >
       <div class="absolute inset-0 bg-tea-900/40 backdrop-blur-sm"></div>
 
-      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden animate-scale-in">
+      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-scale-in">
         <div class="flex items-center justify-between px-6 py-4 border-b border-tea-100 bg-gradient-to-r from-tea-50 to-transparent">
           <h2 class="text-xl font-semibold text-tea-800 font-serif">{{ title }}</h2>
           <button
@@ -345,39 +447,41 @@ function handleClose() {
               </h4>
 
               <div class="space-y-4">
-                <div>
-                  <label class="block text-sm font-medium text-tea-700 mb-1.5 flex items-center gap-1.5">
-                    <UserCheck class="w-4 h-4 text-tea-400" />
-                    处理负责人
-                  </label>
-                  <input
-                    v-model="form.assignee"
-                    type="text"
-                    list="assignee-list"
-                    class="input-field"
-                    placeholder="请输入处理负责人姓名"
-                  />
-                  <datalist id="assignee-list">
-                    <option v-for="person in personOptions" :key="'a-' + person" :value="person">
-                      {{ person }}
-                    </option>
-                    <option value="李研发">李研发</option>
-                    <option value="王品控">王品控</option>
-                    <option value="张配方师">张配方师</option>
-                    <option value="陈主管">陈主管</option>
-                  </datalist>
-                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-tea-700 mb-1.5 flex items-center gap-1.5">
+                      <UserCheck class="w-4 h-4 text-tea-400" />
+                      处理负责人
+                    </label>
+                    <input
+                      v-model="form.assignee"
+                      type="text"
+                      list="assignee-list"
+                      class="input-field"
+                      placeholder="请输入处理负责人姓名"
+                    />
+                    <datalist id="assignee-list">
+                      <option v-for="person in personOptions" :key="'a-' + person" :value="person">
+                        {{ person }}
+                      </option>
+                      <option value="李研发">李研发</option>
+                      <option value="王品控">王品控</option>
+                      <option value="张配方师">张配方师</option>
+                      <option value="陈主管">陈主管</option>
+                    </datalist>
+                  </div>
 
-                <div>
-                  <label class="block text-sm font-medium text-tea-700 mb-1.5 flex items-center gap-1.5">
-                    <CalendarDays class="w-4 h-4 text-tea-400" />
-                    预计完成时间
-                  </label>
-                  <input
-                    v-model="dueDateInput"
-                    type="date"
-                    class="input-field"
-                  />
+                  <div>
+                    <label class="block text-sm font-medium text-tea-700 mb-1.5 flex items-center gap-1.5">
+                      <CalendarDays class="w-4 h-4 text-tea-400" />
+                      预计完成时间
+                    </label>
+                    <input
+                      v-model="dueDateInput"
+                      type="date"
+                      class="input-field"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -416,6 +520,128 @@ function handleClose() {
                     v-model="form.handleNote"
                     class="input-field min-h-[70px] resize-y"
                     placeholder="记录处理进展、沟通情况等..."
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="isEdit" class="pt-4 border-t border-tea-100">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-sm font-semibold text-tea-800 flex items-center gap-2">
+                  <MessageSquare class="w-4 h-4 text-tea-500" />
+                  新增跟进记录
+                </h4>
+                <button
+                  v-if="sortedFollowUps.length > 0"
+                  type="button"
+                  @click="showTimeline = !showTimeline"
+                  class="text-xs text-tea-500 hover:text-tea-700 flex items-center gap-1 transition-colors"
+                >
+                  {{ showTimeline ? '收起' : '查看历史' }} ({{ sortedFollowUps.length }})
+                  <ChevronDown v-if="!showTimeline" class="w-3.5 h-3.5" />
+                  <ChevronUp v-else class="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div v-if="showTimeline && sortedFollowUps.length > 0" class="mb-5">
+                <div class="space-y-3 max-h-64 overflow-y-auto pr-2 bg-tea-50/50 rounded-xl p-4 border border-tea-100">
+                  <div
+                    v-for="(record, index) in sortedFollowUps"
+                    :key="record.id"
+                    class="relative pl-6"
+                  >
+                    <div
+                      class="absolute left-0 top-1.5 w-3 h-3 rounded-full bg-tea-500 border-2 border-white shadow"
+                    ></div>
+                    <div
+                      v-if="index < sortedFollowUps.length - 1"
+                      class="absolute left-[5px] top-5 bottom-[-12px] w-0.5 bg-tea-200"
+                    ></div>
+                    <div class="bg-white rounded-lg p-3 border border-tea-100 shadow-sm">
+                      <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                          <User class="w-3.5 h-3.5 text-tea-500" />
+                          <span class="text-sm font-medium text-tea-700">{{ record.handler }}</span>
+                        </div>
+                        <span class="tag text-xs border" :class="getFollowUpStatusClass(record.status)">
+                          {{ STATUS_LABELS[record.status] }}
+                        </span>
+                      </div>
+                      <p class="text-sm text-tea-800 mb-2">{{ record.description }}</p>
+                      <p class="text-xs text-tea-400 flex items-center gap-1">
+                        <Clock class="w-3 h-3" />
+                        {{ formatDate(record.followUpAt) }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-3 bg-gradient-to-br from-tea-50/50 to-blue-50/30 rounded-xl p-4 border border-tea-100">
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-tea-700 mb-1.5 flex items-center gap-1.5">
+                      <UserCheck class="w-3.5 h-3.5 text-tea-400" />
+                      处理人
+                    </label>
+                    <input
+                      v-model="newFollowUp.handler"
+                      type="text"
+                      list="handler-list"
+                      class="input-field !py-2 !text-sm"
+                      placeholder="请输入处理人"
+                    />
+                    <datalist id="handler-list">
+                      <option value="李研发">李研发</option>
+                      <option value="王品控">王品控</option>
+                      <option value="张配方师">张配方师</option>
+                      <option value="陈主管">陈主管</option>
+                    </datalist>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-tea-700 mb-1.5">处理状态</label>
+                    <select
+                      v-model="newFollowUp.status"
+                      class="input-field !py-2 !text-sm"
+                    >
+                      <option value="pending">待处理</option>
+                      <option value="processing">处理中</option>
+                      <option value="resolved">已解决</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-tea-700 mb-1.5 flex items-center gap-1.5">
+                    <Clock class="w-3.5 h-3.5 text-tea-400" />
+                    跟进时间
+                    <button
+                      type="button"
+                      @click="setNewFollowUpToNow"
+                      class="ml-auto text-xs text-tea-500 hover:text-tea-700 flex items-center gap-1 transition-colors"
+                    >
+                      <RefreshCw class="w-3 h-3" />
+                      现在
+                    </button>
+                  </label>
+                  <div class="flex gap-2">
+                    <input
+                      v-model="newFollowUp.dateInput"
+                      type="date"
+                      class="input-field !py-2 !text-sm flex-1"
+                    />
+                    <input
+                      v-model="newFollowUp.timeInput"
+                      type="time"
+                      class="input-field !py-2 !text-sm w-28"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-tea-700 mb-1.5">跟进说明 *</label>
+                  <textarea
+                    v-model="newFollowUp.description"
+                    class="input-field min-h-[80px] resize-y !text-sm"
+                    placeholder="请填写本次跟进的具体内容、进展或结论...（填写后将自动添加一条跟进记录）"
                   ></textarea>
                 </div>
               </div>

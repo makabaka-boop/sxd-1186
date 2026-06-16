@@ -17,7 +17,7 @@ import MergeItemCard from '../components/MergeItemCard.vue';
 import { useFeedback } from '../composables/useFeedback';
 import { useFilter } from '../composables/useFilter';
 import { useSmartDetect } from '../composables/useSmartDetect';
-import type { Feedback, SmartAlert, FeedbackStatus } from '../types/feedback';
+import type { Feedback, SmartAlert, FeedbackStatus, FollowUpRecord } from '../types/feedback';
 import { downloadJSON } from '../utils/helpers';
 
 const {
@@ -35,7 +35,10 @@ const {
   overdueCount,
   upcomingFeedbacks,
   overdueFeedbacks,
+  longNoFollowUpCount,
+  longNoFollowUpFeedbacks,
   addFeedback,
+  addFollowUpRecord,
   updateFeedback,
   deleteFeedback,
   addMergeItem,
@@ -92,11 +95,24 @@ function handleDelete(id: string) {
   }
 }
 
-function handleFormSubmit(data: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt'> & { status?: FeedbackStatus }) {
+function handleFormSubmit(
+  data: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt'> & {
+    status?: FeedbackStatus;
+    newFollowUp?: Omit<FollowUpRecord, 'id'> | null;
+  }
+) {
+  const { newFollowUp, ...feedbackData } = data;
+
   if (editingFeedback.value) {
-    updateFeedback(editingFeedback.value.id, data);
+    updateFeedback(editingFeedback.value.id, feedbackData);
+    if (newFollowUp) {
+      addFollowUpRecord(editingFeedback.value.id, newFollowUp);
+    }
   } else {
-    addFeedback(data);
+    const newFb = addFeedback(feedbackData);
+    if (newFollowUp) {
+      addFollowUpRecord(newFb.id, newFollowUp);
+    }
   }
   showForm.value = false;
   editingFeedback.value = null;
@@ -153,6 +169,9 @@ function handleFocusAlert(alert: SmartAlert) {
     case 'overdue_feedback':
       setFilter('dueStatus', ['overdue']);
       break;
+    case 'long_no_followup':
+      setFilter('followUpStatus', ['long_no_followup']);
+      break;
     case 'negative_batch':
     case 'missing_fields':
     case 'duplicate_suggestion':
@@ -165,6 +184,18 @@ function handleFocusAlert(alert: SmartAlert) {
       selectedFeedbackIds.value.add(id);
     }
   });
+
+  setTimeout(() => {
+    const firstSelected = alert.relatedFeedbackIds.find((id) =>
+      activeFeedbacks.value.some((f) => f.id === id)
+    );
+    if (firstSelected) {
+      const el = document.querySelector(`[data-feedback-id="${firstSelected}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, 100);
 }
 
 function handleFocusIssue(feedbackIds: string[]) {
@@ -177,7 +208,9 @@ function handleFocusIssue(feedbackIds: string[]) {
   });
 }
 
-function handleFocusSummary(type: 'pending' | 'processing' | 'resolved' | 'upcoming' | 'overdue') {
+function handleFocusSummary(
+  type: 'pending' | 'processing' | 'resolved' | 'upcoming' | 'overdue' | 'long_no_followup'
+) {
   clearAllFilters();
   selectedFeedbackIds.value.clear();
 
@@ -199,6 +232,10 @@ function handleFocusSummary(type: 'pending' | 'processing' | 'resolved' | 'upcom
     case 'overdue':
       setFilter('dueStatus', ['overdue']);
       ids = overdueFeedbacks.value.map((f) => f.id);
+      break;
+    case 'long_no_followup':
+      setFilter('followUpStatus', ['long_no_followup']);
+      ids = longNoFollowUpFeedbacks.value.map((f) => f.id);
       break;
   }
 
@@ -264,6 +301,7 @@ onMounted(() => {
               :resolved-count="resolvedCount"
               :upcoming-count="upcomingCount"
               :overdue-count="overdueCount"
+              :long-no-follow-up-count="longNoFollowUpCount"
               :batch-scores="batchScores"
               :frequent-issues="frequentIssues"
               @focus-issue="handleFocusIssue"
@@ -362,6 +400,7 @@ onMounted(() => {
             <FeedbackCard
               v-for="(feedback, index) in filteredFeedbacks"
               :key="feedback.id"
+              :data-feedback-id="feedback.id"
               :feedback="feedback"
               :selected="selectedFeedbackIds.has(feedback.id)"
               :selectable="true"

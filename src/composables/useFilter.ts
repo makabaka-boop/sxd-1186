@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue';
 import type { Feedback, FilterOptions, Priority, FeedbackStatus } from '../types/feedback';
-import { getDueStatus } from '../utils/helpers';
+import { getDueStatus, getFollowUpStatus } from '../utils/helpers';
 
 export function useFilter(feedbacks: ReturnType<typeof ref<Feedback[]>> | { value: Feedback[] }) {
   const filters = ref<FilterOptions>({
@@ -11,6 +11,7 @@ export function useFilter(feedbacks: ReturnType<typeof ref<Feedback[]>> | { valu
     feedbackPerson: [],
     assignee: [],
     dueStatus: [],
+    followUpStatus: [],
   });
 
   const filteredFeedbacks = computed(() => {
@@ -48,6 +49,12 @@ export function useFilter(feedbacks: ReturnType<typeof ref<Feedback[]>> | { valu
           return false;
         }
       }
+      if (filters.value.followUpStatus.length > 0) {
+        const status = getFollowUpStatus(feedback);
+        if (!filters.value.followUpStatus.includes(status)) {
+          return false;
+        }
+      }
       return true;
     });
   });
@@ -60,7 +67,8 @@ export function useFilter(feedbacks: ReturnType<typeof ref<Feedback[]>> | { valu
       filters.value.status.length > 0 ||
       filters.value.feedbackPerson.length > 0 ||
       filters.value.assignee.length > 0 ||
-      filters.value.dueStatus.length > 0
+      filters.value.dueStatus.length > 0 ||
+      filters.value.followUpStatus.length > 0
     );
   });
 
@@ -83,6 +91,7 @@ export function useFilter(feedbacks: ReturnType<typeof ref<Feedback[]>> | { valu
       feedbackPerson: [],
       assignee: [],
       dueStatus: [],
+      followUpStatus: [],
     };
   }
 

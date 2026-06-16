@@ -10,6 +10,7 @@ import {
   X,
   AlertOctagon,
   Timer,
+  PauseCircle,
 } from 'lucide-vue-next';
 import type { SmartAlert, AlertType } from '../types/feedback';
 
@@ -46,6 +47,8 @@ function getAlertIcon(type: AlertType) {
       return Timer;
     case 'overdue_feedback':
       return AlertOctagon;
+    case 'long_no_followup':
+      return PauseCircle;
     default:
       return AlertCircle;
   }
@@ -94,6 +97,13 @@ function getAlertColor(type: AlertType) {
         border: 'border-red-200',
         text: 'text-red-700',
         icon: 'text-red-500',
+      };
+    case 'long_no_followup':
+      return {
+        bg: 'bg-purple-50',
+        border: 'border-purple-200',
+        text: 'text-purple-700',
+        icon: 'text-purple-500',
       };
     default:
       return {

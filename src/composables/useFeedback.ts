@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue';
-import type { Feedback, MergeItem, Priority, FeedbackStatus } from '../types/feedback';
-import { generateId, getDueStatus } from '../utils/helpers';
+import type { Feedback, MergeItem, Priority, FeedbackStatus, FollowUpRecord } from '../types/feedback';
+import { generateId, getDueStatus, isLongNoFollowUp } from '../utils/helpers';
 import { useStorage } from './useStorage';
 
 const STORAGE_KEY = 'tea-snack-feedback';
@@ -10,6 +10,26 @@ function getDateWithOffset(daysOffset: number, hours: number = 10): string {
   d.setDate(d.getDate() + daysOffset);
   d.setHours(hours, 0, 0, 0);
   return d.toISOString();
+}
+
+function createFollowUp(
+  description: string,
+  handler: string,
+  daysOffset: number,
+  hours: number,
+  status: FeedbackStatus,
+  sourceId?: string,
+  sourceSnack?: string
+): FollowUpRecord {
+  return {
+    id: generateId(),
+    description,
+    handler,
+    followUpAt: getDateWithOffset(daysOffset, hours),
+    status,
+    sourceFeedbackId: sourceId,
+    sourceSnackName: sourceSnack,
+  };
 }
 
 const mockFeedbacks: Feedback[] = [
@@ -29,6 +49,11 @@ const mockFeedbacks: Feedback[] = [
     lastFollowUpAt: getDateWithOffset(-1, 15),
     createdAt: getDateWithOffset(-15),
     updatedAt: getDateWithOffset(-1, 15),
+    followUpRecords: [
+      createFollowUp('初步分析：现有抹茶粉茶多酚含量偏低，建议更换供应商', '李研发', -10, 11, 'pending'),
+      createFollowUp('已联系3家供应商索取样品，预计下周到货', '李研发', -6, 14, 'processing'),
+      createFollowUp('样品已收到，正在做对比测试，初测A供应商香气更浓郁', '李研发', -1, 15, 'processing'),
+    ],
   },
   {
     id: 'fb002',
@@ -46,6 +71,9 @@ const mockFeedbacks: Feedback[] = [
     lastFollowUpAt: getDateWithOffset(-3, 11),
     createdAt: getDateWithOffset(-12),
     updatedAt: getDateWithOffset(-3, 11),
+    followUpRecords: [
+      createFollowUp('已登记，等待产品部评估优先级', '王品控', -3, 11, 'pending'),
+    ],
   },
   {
     id: 'fb003',
@@ -63,6 +91,12 @@ const mockFeedbacks: Feedback[] = [
     lastFollowUpAt: getDateWithOffset(0, 9),
     createdAt: getDateWithOffset(-10),
     updatedAt: getDateWithOffset(0, 9),
+    followUpRecords: [
+      createFollowUp('检测了硬度数据，确实超出内控标准20%', '李研发', -8, 10, 'pending'),
+      createFollowUp('排查发现是烘烤曲线最后阶段温度偏高10度', '李研发', -5, 15, 'processing'),
+      createFollowUp('调整温度后做了3组验证，硬度已恢复正常范围', '李研发', -2, 11, 'processing'),
+      createFollowUp('甜度也同步调整了糖的配比，增加8%砂糖含量', '李研发', 0, 9, 'processing'),
+    ],
   },
   {
     id: 'fb004',
@@ -80,6 +114,10 @@ const mockFeedbacks: Feedback[] = [
     lastFollowUpAt: getDateWithOffset(-2, 14),
     createdAt: getDateWithOffset(-8),
     updatedAt: getDateWithOffset(-2, 14),
+    followUpRecords: [
+      createFollowUp('分析糖含量：目前总糖量28%，建议降至24%', '张配方师', -6, 9, 'pending'),
+      createFollowUp('调整了麦芽糖和白砂糖的比例，甜度降低但保留光泽', '张配方师', -2, 14, 'processing'),
+    ],
   },
   {
     id: 'fb005',
@@ -97,6 +135,11 @@ const mockFeedbacks: Feedback[] = [
     lastFollowUpAt: getDateWithOffset(-6, 16),
     createdAt: getDateWithOffset(-20),
     updatedAt: getDateWithOffset(-6, 16),
+    followUpRecords: [
+      createFollowUp('评估：当前24层工艺可提升空间，计划改为32层', '张配方师', -15, 10, 'pending'),
+      createFollowUp('测试了32层叠工艺，需注意擀皮厚度均匀', '张配方师', -10, 14, 'processing'),
+      createFollowUp('工艺优化完成，试产验证通过', '张配方师', -6, 16, 'resolved'),
+    ],
   },
   {
     id: 'fb006',
@@ -114,6 +157,9 @@ const mockFeedbacks: Feedback[] = [
     lastFollowUpAt: getDateWithOffset(-10, 10),
     createdAt: getDateWithOffset(-25),
     updatedAt: getDateWithOffset(-10, 10),
+    followUpRecords: [
+      createFollowUp('正面反馈，已归档记录', '陈主管', -10, 10, 'resolved'),
+    ],
   },
   {
     id: 'fb007',
@@ -131,6 +177,11 @@ const mockFeedbacks: Feedback[] = [
     lastFollowUpAt: getDateWithOffset(-4, 11),
     createdAt: getDateWithOffset(-18),
     updatedAt: getDateWithOffset(-4, 11),
+    followUpRecords: [
+      createFollowUp('紧急处理：已将此批次产品暂停发货', '王品控', -12, 9, 'pending'),
+      createFollowUp('检测糖含量：35%，确实超标10%，溯源发现是投料错误', '王品控', -8, 15, 'pending'),
+      createFollowUp('已通知相关客户退换货，正在制定减糖方案', '王品控', -4, 11, 'pending'),
+    ],
   },
   {
     id: 'fb008',
@@ -148,6 +199,11 @@ const mockFeedbacks: Feedback[] = [
     lastFollowUpAt: getDateWithOffset(-1, 16),
     createdAt: getDateWithOffset(-15),
     updatedAt: getDateWithOffset(-1, 16),
+    followUpRecords: [
+      createFollowUp('与fb007关联处理，共同制定减糖方案', '李研发', -10, 10, 'pending'),
+      createFollowUp('测试了10%、15%、20%三个减糖梯度', '李研发', -5, 14, 'processing'),
+      createFollowUp('15%减糖方案感官评分最佳，桂花香恢复明显', '李研发', -1, 16, 'processing'),
+    ],
   },
   {
     id: 'fb009',
@@ -165,6 +221,7 @@ const mockFeedbacks: Feedback[] = [
     lastFollowUpAt: '',
     createdAt: getDateWithOffset(-5),
     updatedAt: getDateWithOffset(-5),
+    followUpRecords: [],
   },
   {
     id: 'fb010',
@@ -182,6 +239,7 @@ const mockFeedbacks: Feedback[] = [
     lastFollowUpAt: '',
     createdAt: getDateWithOffset(-3),
     updatedAt: getDateWithOffset(-3),
+    followUpRecords: [],
   },
 ];
 
@@ -258,10 +316,19 @@ export function useFeedback() {
     );
   });
 
+  const longNoFollowUpCount = computed(() => {
+    return activeFeedbacks.value.filter((f) => isLongNoFollowUp(f)).length;
+  });
+
+  const longNoFollowUpFeedbacks = computed(() => {
+    return activeFeedbacks.value.filter((f) => isLongNoFollowUp(f));
+  });
+
   function addFeedback(feedbackData: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt'> & { status?: FeedbackStatus }) {
     const now = new Date().toISOString();
     const newFeedback: Feedback = {
       id: generateId(),
+      followUpRecords: [],
       ...feedbackData,
       status: feedbackData.status || 'pending',
       createdAt: now,
@@ -269,6 +336,20 @@ export function useFeedback() {
     };
     feedbacks.value.push(newFeedback);
     return newFeedback;
+  }
+
+  function addFollowUpRecord(feedbackId: string, record: Omit<FollowUpRecord, 'id'>) {
+    const index = feedbacks.value.findIndex((f) => f.id === feedbackId);
+    if (index !== -1) {
+      const newRecord: FollowUpRecord = {
+        id: generateId(),
+        ...record,
+      };
+      feedbacks.value[index].followUpRecords.push(newRecord);
+      feedbacks.value[index].lastFollowUpAt = record.followUpAt;
+      feedbacks.value[index].status = record.status;
+      feedbacks.value[index].updatedAt = new Date().toISOString();
+    }
   }
 
   function updateFeedback(id: string, updates: Partial<Feedback>) {
@@ -302,10 +383,19 @@ export function useFeedback() {
 
   function addMergeItem(title: string, feedbackIds: string[]) {
     const originalStatuses: Record<string, FeedbackStatus> = {};
+    const allFollowUps: FollowUpRecord[] = [];
+
     feedbackIds.forEach((id) => {
       const feedback = feedbacks.value.find((f) => f.id === id);
       if (feedback) {
         originalStatuses[id] = feedback.status;
+        feedback.followUpRecords.forEach((record) => {
+          allFollowUps.push({
+            ...record,
+            sourceFeedbackId: id,
+            sourceSnackName: feedback.snackName,
+          });
+        });
       }
     });
 
@@ -316,6 +406,9 @@ export function useFeedback() {
       originalStatuses,
       status: 'processing',
       createdAt: new Date().toISOString(),
+      mergedFollowUpRecords: allFollowUps.sort(
+        (a, b) => new Date(a.followUpAt).getTime() - new Date(b.followUpAt).getTime()
+      ),
     };
     mergeItems.value.push(newMergeItem);
 
@@ -383,7 +476,10 @@ export function useFeedback() {
     overdueCount,
     upcomingFeedbacks,
     overdueFeedbacks,
+    longNoFollowUpCount,
+    longNoFollowUpFeedbacks,
     addFeedback,
+    addFollowUpRecord,
     updateFeedback,
     deleteFeedback,
     getFeedbackById,

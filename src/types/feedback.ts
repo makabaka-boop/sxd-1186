@@ -4,6 +4,18 @@ export type FeedbackStatus = 'pending' | 'processing' | 'resolved' | 'merged';
 
 export type DueStatus = 'normal' | 'upcoming' | 'overdue' | 'no_due';
 
+export type FollowUpStatus = 'no_followup' | 'recent_followup' | 'multiple_followups' | 'long_no_followup';
+
+export interface FollowUpRecord {
+  id: string;
+  description: string;
+  handler: string;
+  followUpAt: string;
+  status: FeedbackStatus;
+  sourceFeedbackId?: string;
+  sourceSnackName?: string;
+}
+
 export interface Feedback {
   id: string;
   snackName: string;
@@ -21,6 +33,7 @@ export interface Feedback {
   dueDate?: string;
   handleNote?: string;
   lastFollowUpAt?: string;
+  followUpRecords: FollowUpRecord[];
 }
 
 export interface MergeItem {
@@ -30,6 +43,7 @@ export interface MergeItem {
   originalStatuses: Record<string, FeedbackStatus>;
   status: FeedbackStatus;
   createdAt: string;
+  mergedFollowUpRecords: FollowUpRecord[];
 }
 
 export interface FilterOptions {
@@ -40,6 +54,7 @@ export interface FilterOptions {
   feedbackPerson: string[];
   assignee: string[];
   dueStatus: DueStatus[];
+  followUpStatus: FollowUpStatus[];
 }
 
 export type AlertType =
@@ -48,7 +63,8 @@ export type AlertType =
   | 'duplicate_suggestion'
   | 'high_priority_pending'
   | 'upcoming_deadline'
-  | 'overdue_feedback';
+  | 'overdue_feedback'
+  | 'long_no_followup';
 
 export interface SmartAlert {
   id: string;
@@ -100,6 +116,13 @@ export const DUE_STATUS_LABELS: Record<DueStatus, string> = {
   no_due: '未设置',
 };
 
+export const FOLLOW_UP_STATUS_LABELS: Record<FollowUpStatus, string> = {
+  no_followup: '未跟进',
+  recent_followup: '近期已跟进',
+  multiple_followups: '多次跟进',
+  long_no_followup: '长时间未跟进',
+};
+
 export const ALERT_TYPE_LABELS: Record<AlertType, string> = {
   negative_batch: '负面反馈集中',
   missing_fields: '字段缺失',
@@ -107,4 +130,11 @@ export const ALERT_TYPE_LABELS: Record<AlertType, string> = {
   high_priority_pending: '高优先级待处理',
   upcoming_deadline: '截止日临近',
   overdue_feedback: '处理已逾期',
+  long_no_followup: '长时间未跟进',
+};
+
+export const FOLLOW_UP_DAYS_THRESHOLD = {
+  RECENT: 3,
+  LONG_NO_FOLLOWUP: 7,
+  MULTIPLE: 3,
 };

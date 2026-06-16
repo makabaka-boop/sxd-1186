@@ -18,13 +18,14 @@ defineProps<{
   resolvedCount: number;
   upcomingCount?: number;
   overdueCount?: number;
+  longNoFollowUpCount?: number;
   batchScores: BatchScore[];
   frequentIssues: FrequentIssue[];
 }>();
 
 const emit = defineEmits<{
   focusIssue: [feedbackIds: string[]];
-  focusSummary: [type: 'pending' | 'processing' | 'resolved' | 'upcoming' | 'overdue'];
+  focusSummary: [type: 'pending' | 'processing' | 'resolved' | 'upcoming' | 'overdue' | 'long_no_followup'];
 }>();
 
 function getSweetnessColor(score: number): string {
@@ -108,6 +109,17 @@ function getSweetnessBg(score: number): string {
             <div class="text-2xl font-bold text-red-600">{{ overdueCount ?? 0 }}</div>
           </div>
           <div class="text-xs text-red-600 mt-0.5">已逾期</div>
+        </div>
+        <div
+          class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 text-center border border-purple-100 cursor-pointer hover:shadow-md transition-all active:scale-95 col-span-2"
+          :class="{ 'ring-2 ring-purple-400/60 animate-pulse': (longNoFollowUpCount ?? 0) > 0 }"
+          @click="emit('focusSummary', 'long_no_followup')"
+        >
+          <div class="flex items-center justify-center gap-1.5 mb-1">
+            <Timer class="w-5 h-5 text-purple-500" />
+            <div class="text-2xl font-bold text-purple-600">{{ longNoFollowUpCount ?? 0 }}</div>
+          </div>
+          <div class="text-xs text-purple-600 mt-0.5">长时间未跟进</div>
         </div>
       </div>
       <p class="text-xs text-tea-400 mt-2 text-center">

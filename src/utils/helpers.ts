@@ -1,3 +1,6 @@
+import type { Feedback, FollowUpStatus } from '../types/feedback';
+import { FOLLOW_UP_DAYS_THRESHOLD } from '../types/feedback';
+
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 }
@@ -110,4 +113,54 @@ export function downloadJSON(data: unknown, filename: string): void {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+export function getDaysSinceFollowUp(lastFollowUpAt?: string): number | null {
+  if (!lastFollowUpAt) return null;
+  const now = new Date();
+  const last = new Date(lastFollowUpAt);
+  const diffMs = now.getTime() - last.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+export function getFollowUpStatus(feedback: Feedback): FollowUpStatus {
+  const records = feedback.followUpRecords || [];
+  if (records.length === 0) {
+    return 'no_followup';
+  }
+
+  if (records.length >= FOLLOW_UP_DAYS_THRESHOLD.MULTIPLE) {
+    return 'multiple_followups';
+  }
+
+  const daysSince = getDaysSinceFollowUp(feedback.lastFollowUpAt);
+  if (daysSince !== null && daysSince >= FOLLOW_UP_DAYS_THRESHOLD.LONG_NO_FOLLOWUP) {
+    return 'long_no_followup';
+  }
+
+  if (daysSince !== null && daysSince <= FOLLOW_UP_DAYS_THRESHOLD.RECENT) {
+    return 'recent_followup';
+  }
+
+  return 'no_followup';
+}
+
+export function isLongNoFollowUp(feedback: Feedback): boolean {
+  if (feedback.status === 'resolved' || feedback.status === 'merged') return false;
+  if (!feedback.assignee) return false;
+  const records = feedback.followUpRecords || [];
+  if (records.length === 0) {
+    const daysSinceCreated = Math.floor(
+      (new Date().getTime() - new Date(feedback.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return daysSinceCreated >= FOLLOW_UP_DAYS_THRESHOLD.LONG_NO_FOLLOWUP;
+  }
+  const daysSince = getDaysSinceFollowUp(feedback.lastFollowUpAt);
+  return daysSince !== null && daysSince >= FOLLOW_UP_DAYS_THRESHOLD.LONG_NO_FOLLOWUP;
+}
+
+export function truncateText(text: string, maxLength: number = 50): string {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
 }

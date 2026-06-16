@@ -1,6 +1,6 @@
 import { computed } from 'vue';
 import type { Feedback, SmartAlert, BatchScore, FrequentIssue } from '../types/feedback';
-import { textSimilarity, generateId, getDueStatus, getDaysRemaining } from '../utils/helpers';
+import { textSimilarity, generateId, getDueStatus, getDaysSinceFollowUp, isLongNoFollowUp, getDaysRemaining } from '../utils/helpers';
 
 export function useSmartDetect(feedbacks: { value: Feedback[] }) {
   const negativeBatchAlerts = computed(() => {
@@ -168,9 +168,37 @@ export function useSmartDetect(feedbacks: { value: Feedback[] }) {
     return alerts;
   });
 
+  const longNoFollowUpAlerts = computed(() => {
+    const alerts: SmartAlert[] = [];
+    const longNoFollowUpList = feedbacks.value.filter((f) => isLongNoFollowUp(f));
+
+    if (longNoFollowUpList.length > 0) {
+      const maxDays = Math.max(
+        ...longNoFollowUpList.map((f) => {
+          if (f.lastFollowUpAt) {
+            return getDaysSinceFollowUp(f.lastFollowUpAt) ?? 0;
+          }
+          return Math.floor(
+            (new Date().getTime() - new Date(f.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+          );
+        })
+      );
+      alerts.push({
+        id: generateId(),
+        type: 'long_no_followup',
+        title: `长时间未跟进提醒（最长 ${maxDays} 天）`,
+        description: `有 ${longNoFollowUpList.length} 条已分配的反馈超过 7 天未更新跟进记录，可能存在处理停滞风险，请及时跟进。`,
+        relatedFeedbackIds: longNoFollowUpList.map((f) => f.id),
+      });
+    }
+
+    return alerts;
+  });
+
   const allAlerts = computed(() => {
     return [
       ...overdueFeedbackAlerts.value,
+      ...longNoFollowUpAlerts.value,
       ...upcomingDeadlineAlerts.value,
       ...highPriorityAlerts.value,
       ...negativeBatchAlerts.value,
@@ -249,6 +277,7 @@ export function useSmartDetect(feedbacks: { value: Feedback[] }) {
     highPriorityAlerts,
     upcomingDeadlineAlerts,
     overdueFeedbackAlerts,
+    longNoFollowUpAlerts,
     batchScores,
     frequentIssues,
   };
