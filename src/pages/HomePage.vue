@@ -30,6 +30,11 @@ const {
   allSnackNames,
   allBatches,
   allFeedbackPersons,
+  allAssignees,
+  upcomingCount,
+  overdueCount,
+  upcomingFeedbacks,
+  overdueFeedbacks,
   addFeedback,
   updateFeedback,
   deleteFeedback,
@@ -46,6 +51,7 @@ const {
   toggleFilter,
   clearAllFilters,
   isFilterActive,
+  setFilter,
 } = useFilter(feedbacks);
 
 const { allAlerts, batchScores, frequentIssues } = useSmartDetect(feedbacks);
@@ -150,6 +156,34 @@ function handleFocusIssue(feedbackIds: string[]) {
   });
 }
 
+function handleFocusSummary(type: 'pending' | 'processing' | 'resolved' | 'upcoming' | 'overdue') {
+  clearAllFilters();
+  selectedFeedbackIds.value.clear();
+
+  let ids: string[] = [];
+  switch (type) {
+    case 'pending':
+      setFilter('status', ['pending']);
+      break;
+    case 'processing':
+      setFilter('status', ['processing']);
+      break;
+    case 'resolved':
+      setFilter('status', ['resolved']);
+      break;
+    case 'upcoming':
+      setFilter('dueStatus', ['upcoming']);
+      ids = upcomingFeedbacks.value.map((f) => f.id);
+      break;
+    case 'overdue':
+      setFilter('dueStatus', ['overdue']);
+      ids = overdueFeedbacks.value.map((f) => f.id);
+      break;
+  }
+
+  ids.forEach((id) => selectedFeedbackIds.value.add(id));
+}
+
 function handleDismissAlert(alertId: string) {
   visibleAlerts.value = visibleAlerts.value.filter((a) => a.id !== alertId);
 }
@@ -197,6 +231,7 @@ onMounted(() => {
               :snack-options="allSnackNames"
               :batch-options="allBatches"
               :person-options="allFeedbackPersons"
+              :assignee-options="allAssignees"
               :has-active-filters="hasActiveFilters"
               @toggle-filter="toggleFilter"
               @clear-all="clearAllFilters"
@@ -206,9 +241,12 @@ onMounted(() => {
               :pending-count="pendingCount"
               :processing-count="processingCount"
               :resolved-count="resolvedCount"
+              :upcoming-count="upcomingCount"
+              :overdue-count="overdueCount"
               :batch-scores="batchScores"
               :frequent-issues="frequentIssues"
               @focus-issue="handleFocusIssue"
+              @focus-summary="handleFocusSummary"
             />
           </div>
         </aside>
@@ -262,6 +300,7 @@ onMounted(() => {
               :snack-options="allSnackNames"
               :batch-options="allBatches"
               :person-options="allFeedbackPersons"
+              :assignee-options="allAssignees"
               :has-active-filters="hasActiveFilters"
               @toggle-filter="toggleFilter"
               @clear-all="clearAllFilters"

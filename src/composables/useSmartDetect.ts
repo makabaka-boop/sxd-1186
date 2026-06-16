@@ -1,6 +1,6 @@
 import { computed } from 'vue';
 import type { Feedback, SmartAlert, BatchScore, FrequentIssue } from '../types/feedback';
-import { textSimilarity, generateId } from '../utils/helpers';
+import { textSimilarity, generateId, getDueStatus, getDaysRemaining } from '../utils/helpers';
 
 export function useSmartDetect(feedbacks: { value: Feedback[] }) {
   const negativeBatchAlerts = computed(() => {
@@ -123,8 +123,55 @@ export function useSmartDetect(feedbacks: { value: Feedback[] }) {
     return alerts;
   });
 
+  const upcomingDeadlineAlerts = computed(() => {
+    const alerts: SmartAlert[] = [];
+    const highPriorityUpcoming = feedbacks.value.filter((f) => {
+      if (f.status === 'resolved' || f.status === 'merged') return false;
+      if (f.priority !== 'high') return false;
+      return getDueStatus(f.dueDate, f.status) === 'upcoming';
+    });
+
+    if (highPriorityUpcoming.length > 0) {
+      const minDays = Math.min(
+        ...highPriorityUpcoming.map((f) => getDaysRemaining(f.dueDate) ?? 999)
+      );
+      alerts.push({
+        id: generateId(),
+        type: 'upcoming_deadline',
+        title: `高优先级反馈即将到期（${minDays <= 1 ? '明日' : minDays + '天内'}截止）`,
+        description: `有 ${highPriorityUpcoming.length} 条高优先级反馈将在 3 天内到期，请优先处理。`,
+        relatedFeedbackIds: highPriorityUpcoming.map((f) => f.id),
+      });
+    }
+
+    return alerts;
+  });
+
+  const overdueFeedbackAlerts = computed(() => {
+    const alerts: SmartAlert[] = [];
+    const overdueList = feedbacks.value.filter((f) => {
+      if (f.status === 'resolved' || f.status === 'merged') return false;
+      return getDueStatus(f.dueDate, f.status) === 'overdue';
+    });
+
+    if (overdueList.length > 0) {
+      const highPriorityOverdue = overdueList.filter((f) => f.priority === 'high');
+      alerts.push({
+        id: generateId(),
+        type: 'overdue_feedback',
+        title: `已逾期反馈提醒${highPriorityOverdue.length > 0 ? '（含高优先级）' : ''}`,
+        description: `有 ${overdueList.length} 条反馈已超过预计完成时间，其中 ${highPriorityOverdue.length} 条为高优先级，请立即跟进处理。`,
+        relatedFeedbackIds: overdueList.map((f) => f.id),
+      });
+    }
+
+    return alerts;
+  });
+
   const allAlerts = computed(() => {
     return [
+      ...overdueFeedbackAlerts.value,
+      ...upcomingDeadlineAlerts.value,
       ...highPriorityAlerts.value,
       ...negativeBatchAlerts.value,
       ...duplicateSuggestionAlerts.value,
@@ -200,6 +247,8 @@ export function useSmartDetect(feedbacks: { value: Feedback[] }) {
     missingFieldsAlerts,
     duplicateSuggestionAlerts,
     highPriorityAlerts,
+    upcomingDeadlineAlerts,
+    overdueFeedbackAlerts,
     batchScores,
     frequentIssues,
   };

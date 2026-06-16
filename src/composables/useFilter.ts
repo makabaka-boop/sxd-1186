@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue';
 import type { Feedback, FilterOptions, Priority, FeedbackStatus } from '../types/feedback';
+import { getDueStatus } from '../utils/helpers';
 
 export function useFilter(feedbacks: ReturnType<typeof ref<Feedback[]>> | { value: Feedback[] }) {
   const filters = ref<FilterOptions>({
@@ -8,6 +9,8 @@ export function useFilter(feedbacks: ReturnType<typeof ref<Feedback[]>> | { valu
     priority: [],
     status: [],
     feedbackPerson: [],
+    assignee: [],
+    dueStatus: [],
   });
 
   const filteredFeedbacks = computed(() => {
@@ -30,6 +33,21 @@ export function useFilter(feedbacks: ReturnType<typeof ref<Feedback[]>> | { valu
       ) {
         return false;
       }
+      if (filters.value.assignee.length > 0) {
+        const hasUnassigned = filters.value.assignee.includes('__unassigned__');
+        const matchAssignee = feedback.assignee && filters.value.assignee.includes(feedback.assignee);
+        if (hasUnassigned && !feedback.assignee) {
+          // match
+        } else if (!matchAssignee) {
+          return false;
+        }
+      }
+      if (filters.value.dueStatus.length > 0) {
+        const status = getDueStatus(feedback.dueDate, feedback.status);
+        if (!filters.value.dueStatus.includes(status)) {
+          return false;
+        }
+      }
       return true;
     });
   });
@@ -40,7 +58,9 @@ export function useFilter(feedbacks: ReturnType<typeof ref<Feedback[]>> | { valu
       filters.value.batch.length > 0 ||
       filters.value.priority.length > 0 ||
       filters.value.status.length > 0 ||
-      filters.value.feedbackPerson.length > 0
+      filters.value.feedbackPerson.length > 0 ||
+      filters.value.assignee.length > 0 ||
+      filters.value.dueStatus.length > 0
     );
   });
 
@@ -61,6 +81,8 @@ export function useFilter(feedbacks: ReturnType<typeof ref<Feedback[]>> | { valu
       priority: [],
       status: [],
       feedbackPerson: [],
+      assignee: [],
+      dueStatus: [],
     };
   }
 

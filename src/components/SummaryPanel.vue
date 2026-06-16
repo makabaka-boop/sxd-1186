@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { Clock, AlertTriangle, TrendingUp, BarChart3, Flame } from 'lucide-vue-next';
+import {
+  Clock,
+  AlertTriangle,
+  TrendingUp,
+  BarChart3,
+  Flame,
+  AlertOctagon,
+  Zap,
+  Timer,
+} from 'lucide-vue-next';
 import type { BatchScore, FrequentIssue } from '../types/feedback';
 import { SWEETNESS_LABELS } from '../types/feedback';
 
@@ -7,12 +16,15 @@ defineProps<{
   pendingCount: number;
   processingCount: number;
   resolvedCount: number;
+  upcomingCount?: number;
+  overdueCount?: number;
   batchScores: BatchScore[];
   frequentIssues: FrequentIssue[];
 }>();
 
 const emit = defineEmits<{
   focusIssue: [feedbackIds: string[]];
+  focusSummary: [type: 'pending' | 'processing' | 'resolved' | 'upcoming' | 'overdue'];
 }>();
 
 function getSweetnessColor(score: number): string {
@@ -33,22 +45,74 @@ function getSweetnessBg(score: number): string {
     <div>
       <h3 class="text-lg font-semibold text-tea-800 font-serif flex items-center gap-2 mb-3">
         <BarChart3 class="w-5 h-5 text-tea-500" />
-        待处理反馈
+        处理状态总览
       </h3>
       <div class="grid grid-cols-3 gap-3">
-        <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-4 text-center border border-amber-100">
+        <div
+          class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-4 text-center border border-amber-100 cursor-pointer hover:shadow-md transition-all active:scale-95"
+          @click="emit('focusSummary', 'pending')"
+        >
           <div class="text-3xl font-bold text-amber-600">{{ pendingCount }}</div>
-          <div class="text-xs text-amber-600 mt-1">待处理</div>
+          <div class="text-xs text-amber-600 mt-1 flex items-center justify-center gap-1">
+            <Timer class="w-3 h-3" />
+            待处理
+          </div>
         </div>
-        <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center border border-blue-100">
+        <div
+          class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center border border-blue-100 cursor-pointer hover:shadow-md transition-all active:scale-95"
+          @click="emit('focusSummary', 'processing')"
+        >
           <div class="text-3xl font-bold text-blue-600">{{ processingCount }}</div>
-          <div class="text-xs text-blue-600 mt-1">处理中</div>
+          <div class="text-xs text-blue-600 mt-1 flex items-center justify-center gap-1">
+            <Zap class="w-3 h-3" />
+            处理中
+          </div>
         </div>
-        <div class="bg-gradient-to-br from-matcha-50 to-matcha-100 rounded-xl p-4 text-center border border-matcha-100">
+        <div
+          class="bg-gradient-to-br from-matcha-50 to-matcha-100 rounded-xl p-4 text-center border border-matcha-100 cursor-pointer hover:shadow-md transition-all active:scale-95"
+          @click="emit('focusSummary', 'resolved')"
+        >
           <div class="text-3xl font-bold text-matcha-600">{{ resolvedCount }}</div>
-          <div class="text-xs text-matcha-600 mt-1">已解决</div>
+          <div class="text-xs text-matcha-600 mt-1 flex items-center justify-center gap-1">
+            <TrendingUp class="w-3 h-3" />
+            已解决
+          </div>
         </div>
       </div>
+    </div>
+
+    <div>
+      <h3 class="text-lg font-semibold text-tea-800 font-serif flex items-center gap-2 mb-3">
+        <Clock class="w-5 h-5 text-caramel-500" />
+        跟进看板
+      </h3>
+      <div class="grid grid-cols-2 gap-3">
+        <div
+          class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 text-center border border-orange-100 cursor-pointer hover:shadow-md transition-all active:scale-95"
+          :class="{ 'ring-2 ring-orange-400/50': (upcomingCount ?? 0) > 0 }"
+          @click="emit('focusSummary', 'upcoming')"
+        >
+          <div class="flex items-center justify-center gap-1.5 mb-1">
+            <Clock class="w-5 h-5 text-orange-500" />
+            <div class="text-2xl font-bold text-orange-600">{{ upcomingCount ?? 0 }}</div>
+          </div>
+          <div class="text-xs text-orange-600 mt-0.5">即将到期</div>
+        </div>
+        <div
+          class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 text-center border border-red-100 cursor-pointer hover:shadow-md transition-all active:scale-95"
+          :class="{ 'ring-2 ring-red-400/60 animate-pulse': (overdueCount ?? 0) > 0 }"
+          @click="emit('focusSummary', 'overdue')"
+        >
+          <div class="flex items-center justify-center gap-1.5 mb-1">
+            <AlertOctagon class="w-5 h-5 text-red-500" />
+            <div class="text-2xl font-bold text-red-600">{{ overdueCount ?? 0 }}</div>
+          </div>
+          <div class="text-xs text-red-600 mt-0.5">已逾期</div>
+        </div>
+      </div>
+      <p class="text-xs text-tea-400 mt-2 text-center">
+        点击卡片可快速筛选对应反馈
+      </p>
     </div>
 
     <div>

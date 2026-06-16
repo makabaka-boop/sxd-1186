@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import { X, Plus } from 'lucide-vue-next';
+import { X, Plus, UserCheck, CalendarDays, FileText, Clock } from 'lucide-vue-next';
 import type { Feedback, Priority, FeedbackStatus } from '../types/feedback';
 import { PRIORITY_LABELS, STATUS_LABELS, SWEETNESS_LABELS } from '../types/feedback';
+import { toDateInputValue, formatDate } from '../utils/helpers';
 
 const props = defineProps<{
   visible: boolean;
@@ -26,9 +27,14 @@ const form = ref({
   feedbackPerson: '',
   priority: 'medium' as Priority,
   status: 'pending' as FeedbackStatus,
+  assignee: '',
+  dueDate: '',
+  handleNote: '',
+  lastFollowUpAt: '',
 });
 
 const keywordInput = ref('');
+const dueDateInput = ref('');
 
 const isEdit = computed(() => !!props.feedback);
 const title = computed(() => (isEdit.value ? '编辑反馈' : '新增反馈'));
@@ -52,7 +58,12 @@ watch(
           feedbackPerson: props.feedback.feedbackPerson,
           priority: props.feedback.priority,
           status: props.feedback.status,
+          assignee: props.feedback.assignee || '',
+          dueDate: props.feedback.dueDate || '',
+          handleNote: props.feedback.handleNote || '',
+          lastFollowUpAt: props.feedback.lastFollowUpAt || '',
         };
+        dueDateInput.value = toDateInputValue(props.feedback.dueDate);
       } else {
         form.value = {
           snackName: '',
@@ -63,12 +74,27 @@ watch(
           feedbackPerson: '',
           priority: 'medium',
           status: 'pending',
+          assignee: '',
+          dueDate: '',
+          handleNote: '',
+          lastFollowUpAt: '',
         };
+        dueDateInput.value = '';
       }
       keywordInput.value = '';
     }
   }
 );
+
+watch(dueDateInput, (val) => {
+  if (val) {
+    const d = new Date(val);
+    d.setHours(18, 0, 0, 0);
+    form.value.dueDate = d.toISOString();
+  } else {
+    form.value.dueDate = '';
+  }
+});
 
 function addKeyword(keyword: string) {
   if (keyword && !form.value.textureKeywords.includes(keyword)) {
@@ -104,7 +130,11 @@ function handleSubmit() {
     alert('请填写反馈人');
     return;
   }
-  emit('submit', { ...form.value });
+  const submitData = { ...form.value };
+  if (isEdit.value && (form.value.handleNote || form.value.status !== props.feedback?.status)) {
+    submitData.lastFollowUpAt = new Date().toISOString();
+  }
+  emit('submit', submitData);
 }
 
 function handleClose() {
@@ -133,7 +163,7 @@ function handleClose() {
         </div>
 
         <div class="px-6 py-5 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <div class="space-y-4">
+          <div class="space-y-5">
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-tea-700 mb-1.5">茶点名称 *</label>
@@ -258,9 +288,66 @@ function handleClose() {
               <label class="block text-sm font-medium text-tea-700 mb-1.5">改进建议</label>
               <textarea
                 v-model="form.suggestion"
-                class="input-field min-h-[100px] resize-y"
+                class="input-field min-h-[80px] resize-y"
                 placeholder="请描述具体的改进建议..."
               ></textarea>
+            </div>
+
+            <div class="pt-4 border-t border-tea-100">
+              <h4 class="text-sm font-semibold text-tea-800 mb-4 flex items-center gap-2">
+                <FileText class="w-4 h-4 text-tea-500" />
+                处理跟进信息
+              </h4>
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-tea-700 mb-1.5 flex items-center gap-1.5">
+                    <UserCheck class="w-4 h-4 text-tea-400" />
+                    处理负责人
+                  </label>
+                  <input
+                    v-model="form.assignee"
+                    type="text"
+                    list="assignee-list"
+                    class="input-field"
+                    placeholder="请输入处理负责人姓名"
+                  />
+                  <datalist id="assignee-list">
+                    <option v-for="person in personOptions" :key="'a-' + person" :value="person">
+                      {{ person }}
+                    </option>
+                    <option value="李研发">李研发</option>
+                    <option value="王品控">王品控</option>
+                    <option value="张配方师">张配方师</option>
+                    <option value="陈主管">陈主管</option>
+                  </datalist>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-tea-700 mb-1.5 flex items-center gap-1.5">
+                    <CalendarDays class="w-4 h-4 text-tea-400" />
+                    预计完成时间
+                  </label>
+                  <input
+                    v-model="dueDateInput"
+                    type="date"
+                    class="input-field"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-tea-700 mb-1.5">处理备注</label>
+                  <textarea
+                    v-model="form.handleNote"
+                    class="input-field min-h-[70px] resize-y"
+                    placeholder="记录处理进展、沟通情况等..."
+                  ></textarea>
+                  <p v-if="form.lastFollowUpAt" class="text-xs text-tea-400 mt-1 flex items-center gap-1">
+                    <Clock class="w-3 h-3" />
+                    上次跟进：{{ formatDate(form.lastFollowUpAt) }}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div>

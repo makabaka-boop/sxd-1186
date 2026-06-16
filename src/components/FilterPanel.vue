@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { Filter, X, ChevronDown, ChevronUp } from 'lucide-vue-next';
-import type { FilterOptions, Priority, FeedbackStatus } from '../types/feedback';
-import { PRIORITY_LABELS, STATUS_LABELS } from '../types/feedback';
+import { Filter, X, ChevronDown, ChevronUp, UserCheck, Clock } from 'lucide-vue-next';
+import type { FilterOptions, Priority, FeedbackStatus, DueStatus } from '../types/feedback';
+import { PRIORITY_LABELS, STATUS_LABELS, DUE_STATUS_LABELS } from '../types/feedback';
 
 const props = defineProps<{
   filters: FilterOptions;
   snackOptions: string[];
   batchOptions: string[];
   personOptions: string[];
+  assigneeOptions?: string[];
   hasActiveFilters: boolean;
 }>();
 
@@ -27,6 +28,8 @@ function clearAll() {
 function isActive(field: keyof FilterOptions, value: string): boolean {
   return props.filters[field].includes(value as never);
 }
+
+const dueStatusOptions: DueStatus[] = ['overdue', 'upcoming', 'normal', 'no_due'];
 </script>
 
 <template>
@@ -128,11 +131,76 @@ function isActive(field: keyof FilterOptions, value: string): boolean {
       </div>
 
       <div>
+        <h4 class="text-sm font-medium text-tea-700 mb-2 flex items-center gap-1.5">
+          <UserCheck class="w-3.5 h-3.5 text-tea-400" />
+          处理负责人
+        </h4>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-if="assigneeOptions && assigneeOptions.length > 0"
+            v-for="person in assigneeOptions"
+            :key="'assignee-' + person"
+            @click="toggleFilter('assignee', person)"
+            class="px-2.5 py-1 text-xs rounded-full border transition-all"
+            :class="
+              isActive('assignee', person)
+                ? 'bg-blue-500 border-blue-500 text-white'
+                : 'bg-white border-tea-200 text-tea-600 hover:border-tea-400 hover:bg-tea-50'
+            "
+          >
+            {{ person }}
+          </button>
+          <button
+            @click="toggleFilter('assignee', '__unassigned__')"
+            class="px-2.5 py-1 text-xs rounded-full border transition-all"
+            :class="
+              isActive('assignee', '__unassigned__')
+                ? 'bg-gray-500 border-gray-500 text-white'
+                : 'bg-white border-tea-200 text-tea-500 hover:border-tea-400 hover:bg-tea-50'
+            "
+          >
+            未分配
+          </button>
+          <div v-if="(!assigneeOptions || assigneeOptions.length === 0)" class="text-xs text-tea-400 py-1">
+            暂无负责人数据
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h4 class="text-sm font-medium text-tea-700 mb-2 flex items-center gap-1.5">
+          <Clock class="w-3.5 h-3.5 text-tea-400" />
+          截止状态
+        </h4>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-for="status in dueStatusOptions"
+            :key="status"
+            @click="toggleFilter('dueStatus', status)"
+            class="px-2.5 py-1 text-xs rounded-full border transition-all"
+            :class="[
+              isActive('dueStatus', status)
+                ? status === 'overdue'
+                  ? 'bg-red-500 border-red-500 text-white'
+                  : status === 'upcoming'
+                  ? 'bg-orange-500 border-orange-500 text-white'
+                  : status === 'normal'
+                  ? 'bg-matcha-500 border-matcha-500 text-white'
+                  : 'bg-gray-500 border-gray-500 text-white'
+                : 'bg-white border-tea-200 text-tea-600 hover:border-tea-400 hover:bg-tea-50',
+            ]"
+          >
+            {{ DUE_STATUS_LABELS[status] }}
+          </button>
+        </div>
+      </div>
+
+      <div>
         <h4 class="text-sm font-medium text-tea-700 mb-2">反馈人</h4>
         <div class="flex flex-wrap gap-1.5">
           <button
             v-for="person in personOptions"
-            :key="person"
+            :key="'fb-' + person"
             @click="toggleFilter('feedbackPerson', person)"
             class="px-2.5 py-1 text-xs rounded-full border transition-all"
             :class="

@@ -1,9 +1,16 @@
 import { ref, computed } from 'vue';
 import type { Feedback, MergeItem, Priority, FeedbackStatus } from '../types/feedback';
-import { generateId } from '../utils/helpers';
+import { generateId, getDueStatus } from '../utils/helpers';
 import { useStorage } from './useStorage';
 
 const STORAGE_KEY = 'tea-snack-feedback';
+
+function getDateWithOffset(daysOffset: number, hours: number = 10): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysOffset);
+  d.setHours(hours, 0, 0, 0);
+  return d.toISOString();
+}
 
 const mockFeedbacks: Feedback[] = [
   {
@@ -15,9 +22,13 @@ const mockFeedbacks: Feedback[] = [
     suggestion: '抹茶味可以再浓郁一些，目前茶味偏淡',
     feedbackPerson: '张小明',
     priority: 'high',
-    status: 'pending',
-    createdAt: '2024-06-01T10:30:00',
-    updatedAt: '2024-06-01T10:30:00',
+    status: 'processing',
+    assignee: '李研发',
+    dueDate: getDateWithOffset(-2),
+    handleNote: '已联系供应商更换抹茶粉，等待样品确认',
+    lastFollowUpAt: getDateWithOffset(-1, 15),
+    createdAt: getDateWithOffset(-15),
+    updatedAt: getDateWithOffset(-1, 15),
   },
   {
     id: 'fb002',
@@ -29,8 +40,12 @@ const mockFeedbacks: Feedback[] = [
     feedbackPerson: '李小红',
     priority: 'medium',
     status: 'pending',
-    createdAt: '2024-06-01T11:00:00',
-    updatedAt: '2024-06-01T11:00:00',
+    assignee: '王品控',
+    dueDate: getDateWithOffset(2),
+    handleNote: '',
+    lastFollowUpAt: getDateWithOffset(-3, 11),
+    createdAt: getDateWithOffset(-12),
+    updatedAt: getDateWithOffset(-3, 11),
   },
   {
     id: 'fb003',
@@ -42,8 +57,12 @@ const mockFeedbacks: Feedback[] = [
     feedbackPerson: '王大力',
     priority: 'high',
     status: 'pending',
-    createdAt: '2024-06-01T14:20:00',
-    updatedAt: '2024-06-01T14:20:00',
+    assignee: '李研发',
+    dueDate: getDateWithOffset(1),
+    handleNote: '初步判断是烘烤温度偏高，正在做对比实验',
+    lastFollowUpAt: getDateWithOffset(0, 9),
+    createdAt: getDateWithOffset(-10),
+    updatedAt: getDateWithOffset(0, 9),
   },
   {
     id: 'fb004',
@@ -55,8 +74,12 @@ const mockFeedbacks: Feedback[] = [
     feedbackPerson: '赵小美',
     priority: 'medium',
     status: 'processing',
-    createdAt: '2024-06-02T09:15:00',
-    updatedAt: '2024-06-02T09:15:00',
+    assignee: '张配方师',
+    dueDate: getDateWithOffset(7),
+    handleNote: '已调整糖的配比，下周小批量试产',
+    lastFollowUpAt: getDateWithOffset(-2, 14),
+    createdAt: getDateWithOffset(-8),
+    updatedAt: getDateWithOffset(-2, 14),
   },
   {
     id: 'fb005',
@@ -68,8 +91,12 @@ const mockFeedbacks: Feedback[] = [
     feedbackPerson: '张小明',
     priority: 'low',
     status: 'resolved',
-    createdAt: '2024-06-02T10:30:00',
-    updatedAt: '2024-06-03T16:00:00',
+    assignee: '张配方师',
+    dueDate: getDateWithOffset(-5),
+    handleNote: '酥皮已优化为32层折叠工艺，口感更酥松',
+    lastFollowUpAt: getDateWithOffset(-6, 16),
+    createdAt: getDateWithOffset(-20),
+    updatedAt: getDateWithOffset(-6, 16),
   },
   {
     id: 'fb006',
@@ -81,8 +108,12 @@ const mockFeedbacks: Feedback[] = [
     feedbackPerson: '李小红',
     priority: 'low',
     status: 'resolved',
-    createdAt: '2024-06-03T11:00:00',
-    updatedAt: '2024-06-03T11:00:00',
+    assignee: '',
+    dueDate: '',
+    handleNote: '该批次反馈良好，维持现有配方',
+    lastFollowUpAt: getDateWithOffset(-10, 10),
+    createdAt: getDateWithOffset(-25),
+    updatedAt: getDateWithOffset(-10, 10),
   },
   {
     id: 'fb007',
@@ -94,8 +125,12 @@ const mockFeedbacks: Feedback[] = [
     feedbackPerson: '王大力',
     priority: 'high',
     status: 'pending',
-    createdAt: '2024-06-03T14:00:00',
-    updatedAt: '2024-06-03T14:00:00',
+    assignee: '王品控',
+    dueDate: getDateWithOffset(-5),
+    handleNote: '客户强烈投诉，需要优先处理',
+    lastFollowUpAt: getDateWithOffset(-4, 11),
+    createdAt: getDateWithOffset(-18),
+    updatedAt: getDateWithOffset(-4, 11),
   },
   {
     id: 'fb008',
@@ -106,9 +141,13 @@ const mockFeedbacks: Feedback[] = [
     suggestion: '甜味有点重，盖过了桂花香',
     feedbackPerson: '赵小美',
     priority: 'high',
-    status: 'pending',
-    createdAt: '2024-06-03T15:30:00',
-    updatedAt: '2024-06-03T15:30:00',
+    status: 'processing',
+    assignee: '李研发',
+    dueDate: getDateWithOffset(3),
+    handleNote: '正在做甜度梯度测试，已验证15%减糖方案',
+    lastFollowUpAt: getDateWithOffset(-1, 16),
+    createdAt: getDateWithOffset(-15),
+    updatedAt: getDateWithOffset(-1, 16),
   },
   {
     id: 'fb009',
@@ -120,8 +159,12 @@ const mockFeedbacks: Feedback[] = [
     feedbackPerson: '张小明',
     priority: 'medium',
     status: 'pending',
-    createdAt: '2024-06-04T10:00:00',
-    updatedAt: '2024-06-04T10:00:00',
+    assignee: '',
+    dueDate: '',
+    handleNote: '',
+    lastFollowUpAt: '',
+    createdAt: getDateWithOffset(-5),
+    updatedAt: getDateWithOffset(-5),
   },
   {
     id: 'fb010',
@@ -133,8 +176,12 @@ const mockFeedbacks: Feedback[] = [
     feedbackPerson: '陈老师',
     priority: 'low',
     status: 'pending',
-    createdAt: '2024-06-04T11:20:00',
-    updatedAt: '2024-06-04T11:20:00',
+    assignee: '张配方师',
+    dueDate: getDateWithOffset(15),
+    handleNote: '',
+    lastFollowUpAt: '',
+    createdAt: getDateWithOffset(-3),
+    updatedAt: getDateWithOffset(-3),
   },
 ];
 
@@ -181,6 +228,34 @@ export function useFeedback() {
 
   const allFeedbackPersons = computed(() => {
     return [...new Set(feedbacks.value.map((f) => f.feedbackPerson))].sort();
+  });
+
+  const allAssignees = computed(() => {
+    return [...new Set(feedbacks.value.map((f) => f.assignee).filter(Boolean) as string[])].sort();
+  });
+
+  const upcomingCount = computed(() => {
+    return activeFeedbacks.value.filter(
+      (f) => getDueStatus(f.dueDate, f.status) === 'upcoming'
+    ).length;
+  });
+
+  const overdueCount = computed(() => {
+    return activeFeedbacks.value.filter(
+      (f) => getDueStatus(f.dueDate, f.status) === 'overdue'
+    ).length;
+  });
+
+  const upcomingFeedbacks = computed(() => {
+    return activeFeedbacks.value.filter(
+      (f) => getDueStatus(f.dueDate, f.status) === 'upcoming'
+    );
+  });
+
+  const overdueFeedbacks = computed(() => {
+    return activeFeedbacks.value.filter(
+      (f) => getDueStatus(f.dueDate, f.status) === 'overdue'
+    );
   });
 
   function addFeedback(feedbackData: Omit<Feedback, 'id' | 'createdAt' | 'updatedAt'> & { status?: FeedbackStatus }) {
@@ -303,6 +378,11 @@ export function useFeedback() {
     allSnackNames,
     allBatches,
     allFeedbackPersons,
+    allAssignees,
+    upcomingCount,
+    overdueCount,
+    upcomingFeedbacks,
+    overdueFeedbacks,
     addFeedback,
     updateFeedback,
     deleteFeedback,

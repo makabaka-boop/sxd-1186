@@ -11,6 +11,49 @@ export function formatDate(dateStr: string): string {
   return `${month}月${day}日 ${hours}:${minutes}`;
 }
 
+export function formatDateShort(dateStr: string): string {
+  const date = new Date(dateStr);
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  return `${month}月${day}日`;
+}
+
+export function getDueStatus(dueDate?: string, status?: string): 'normal' | 'upcoming' | 'overdue' | 'no_due' {
+  if (!dueDate) return 'no_due';
+  if (status === 'resolved' || status === 'merged') return 'normal';
+
+  const now = new Date();
+  const due = new Date(dueDate);
+  const dueEndOfDay = new Date(due);
+  dueEndOfDay.setHours(23, 59, 59, 999);
+
+  const diffMs = dueEndOfDay.getTime() - now.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+  if (diffMs < 0) return 'overdue';
+  if (diffDays <= 3) return 'upcoming';
+  return 'normal';
+}
+
+export function getDaysRemaining(dueDate?: string): number | null {
+  if (!dueDate) return null;
+  const now = new Date();
+  const due = new Date(dueDate);
+  const dueEndOfDay = new Date(due);
+  dueEndOfDay.setHours(23, 59, 59, 999);
+  const diffMs = dueEndOfDay.getTime() - now.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+export function toDateInputValue(dateStr?: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function textSimilarity(text1: string, text2: string): number {
   if (!text1 || !text2) return 0;
   const s1 = text1.toLowerCase().trim();

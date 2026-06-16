@@ -8,6 +8,8 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  AlertOctagon,
+  Timer,
 } from 'lucide-vue-next';
 import type { SmartAlert, AlertType } from '../types/feedback';
 
@@ -40,6 +42,10 @@ function getAlertIcon(type: AlertType) {
       return Layers;
     case 'high_priority_pending':
       return Clock;
+    case 'upcoming_deadline':
+      return Timer;
+    case 'overdue_feedback':
+      return AlertOctagon;
     default:
       return AlertCircle;
   }
@@ -74,6 +80,20 @@ function getAlertColor(type: AlertType) {
         border: 'border-tea-200',
         text: 'text-tea-700',
         icon: 'text-tea-500',
+      };
+    case 'upcoming_deadline':
+      return {
+        bg: 'bg-orange-50',
+        border: 'border-orange-200',
+        text: 'text-orange-700',
+        icon: 'text-orange-500',
+      };
+    case 'overdue_feedback':
+      return {
+        bg: 'bg-red-50',
+        border: 'border-red-200',
+        text: 'text-red-700',
+        icon: 'text-red-500',
       };
     default:
       return {
